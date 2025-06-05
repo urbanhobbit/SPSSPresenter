@@ -12,7 +12,7 @@ if uploaded_file is not None:
         if filename.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
         elif filename.endswith('.dta'):
-            df = pd.read_stata(uploaded_file)
+            df = pd.read_stata(uploaded_file, convert_categoricals=False)  # <--- important
         else:
             st.error("Unsupported file type.")
             st.stop()
@@ -20,8 +20,11 @@ if uploaded_file is not None:
         st.error(f"Error loading file: {e}")
         st.stop()
 
+    # Convert everything to string first to avoid pyarrow issues
+    df_display = df.astype(str)
+
     st.write("### Data Preview")
-    st.dataframe(df.head())
+    st.dataframe(df_display.head())  # <-- SAFE rendering
 
     column = st.selectbox("Select variable", df.columns)
 

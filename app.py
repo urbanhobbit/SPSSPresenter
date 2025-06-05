@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-from collections import Counter
-import statistics
 
-st.title("Descriptive Statistics Viewer (CSV & DTA)")
+st.title("Descriptive Statistics Viewer (CSV & Stata DTA)")
 
 uploaded_file = st.file_uploader("Upload CSV or Stata DTA file", type=["csv", "dta"])
 
@@ -29,12 +27,10 @@ if uploaded_file is not None:
 
     values = df[column].dropna()
 
-    # Try numeric summary
-    try:
-        numeric = pd.to_numeric(values)
+    if pd.api.types.is_numeric_dtype(values):
         st.write("### Descriptive Statistics (Numeric)")
-        st.write(numeric.describe())
-    except:
+        st.write(values.describe())
+    else:
         st.write("### Descriptive Statistics (Non-Numeric)")
         st.write(f"Unique values: {values.nunique()}")
 

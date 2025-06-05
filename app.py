@@ -1,51 +1,49 @@
 import streamlit as st
 import pandas as pd
+import pyreadstat
 
-st.title("Stata DTA Viewer with Labels")
+st.title("Full Descriptive Statistics Viewer with Labels")
 
-uploaded_file = st.file_uploader("Upload Stata DTA file", type=["dta"])
+uploaded_file = st.file_uploader("Upload SPSS (.sav) or Stata (.dta) file", type=["sav", "dta"])
 
 if uploaded_file is not None:
     try:
-        reader = pd.read_stata(uploaded_file, iterator=True)
-        df = reader.read()
-        value_labels = reader.value_labels()
+        if uploaded_file.name.endswith('.sav'):
+            df, meta = pyreadstat.read_sav(uploaded_file)
+        elif uploaded_file.name.endswith('.dta'):
+            df, meta = pyreadstat.read_dta(uploaded_file)
+        else:
+            st.error("Unsupported file type.")
+            st.stop()
     except Exception as e:
-        st.error(f"Error loading file: {e}")
+        st.error(f"Error reading file: {e}")
         st.stop()
 
-    # Simulated variable labels (pandas cannot read variable labels)
-    # We simply fall back to column names.
-    variable_labels = {col: col for col in df.columns}
-
-    # Build selection menu with variable labels
-    var_options = [
-        f"{variable_labels[var]} [{var}]" for var in df.columns
+    # Create dropdown with variable labels
+    variable_options = [
+        f"{meta.column_labels[i]} [{var}]" if meta.column_labels[i] else var
+        for i, var in enumerate(meta.column_names)
     ]
-    selected_option = st.selectbox("Select a variable to analyze", var_options)
+
+    selected_option = st.selectbox("Select variable", variable_options)
     selected_var = selected_option.split("[")[-1].strip("]")
 
-    values = df[selected_var].dropna()
+    # Display selected variable label
+    var_label = meta.column_labels[meta.column_names.index(selected_var)]
+    st.subheader(f"Variable: {selected_var}")
+    if var_label:
+        st.write(f"Label: {var_label}")
 
-    # Apply value labels if exist
-    label_dict = value_labels.get(selected_var, None)
+    series = df[selected_var].dropna()
 
-    if label_dict:
-        mapped_values = values.map(label_dict).fillna(values)
-        display_series = mapped_values
+    # Apply value labels if they exist
+    value_label_set = meta.variable_value_labels.get(selected_var, None)
+    if isinstance(value_label_set, dict):
+        display_series = series.map(value_label_set).fillna(series)
     else:
-        display_series = values
+        display_series = series
 
-    # Descriptive statistics
-    if pd.api.types.is_numeric_dtype(values):
-        st.write("### Descriptive Statistics (Numeric)")
-        st.write(values.describe())
-    else:
-        st.write("### Descriptive Statistics (Non-Numeric)")
-        st.write(f"Unique values: {values.nunique()}")
-
-    # Frequency distribution with value labels applied
+    # Frequency table with percentages
     freq_table = display_series.value_counts(dropna=False).reset_index()
     freq_table.columns = ['Value Label', 'Frequency']
-    st.write("### Frequency Distribution")
-    st.dataframe(freq_table)
+    freq_table['Percentage'] = (freq_table['Frequency'] / freq_table['Frequency'].sum() * 100).rou*_

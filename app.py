@@ -1,50 +1,46 @@
 import streamlit as st
 import pandas as pd
-import statafile
+import json
 from collections import Counter
 
-st.title("Stata DTA Viewer with Full Labels (Pure Python Streamlit Cloud Compatible)")
+st.title("CSV Viewer with Variable and Value Labels")
 
-uploaded_file = st.file_uploader("Upload Stata DTA file", type=["dta"])
+data_file = st.file_uploader("Upload CSV data file", type=["csv"])
+varlabel_file = st.file_uploader("Upload variable labels JSON file", type=["json"])
+vallabel_file = st.file_uploader("Upload value labels JSON file", type=["json"])
 
-if uploaded_file is not None:
-    try:
-        with statafile.open(uploaded_file) as dta:
-            data = [row for row in dta]  # full data read
-            var_names = dta.variable_names
-            var_labels = dta.variable_labels
-            value_labels = dta.value_labels
-            label_sets = dta.value_label_sets
-    except Exception as e:
-        st.error(f"Error reading file: {e}")
-        st.stop()
+if data_file and varlabel_file and vallabel_file:
+    # Load data
+    df = pd.read_csv(data_file)
 
-    # Convert data to pandas DataFrame
-    df = pd.DataFrame(data, columns=var_names)
+    # Load variable labels
+    variable_labels = json.load(varlabel_file)
 
-    # Build selection menu with variable labels
+    # Load value labels
+    value_labels = json.load(vallabel_file)
+
+    # Variable selection with variable labels
     var_options = [
-        f"{var_labels.get(var, var)} [{var}]" for var in var_names
+        f"{variable_labels.get(var, var)} [{var}]" for var in df.columns
     ]
     selected_option = st.selectbox("Select variable", var_options)
     selected_var = selected_option.split("[")[-1].strip("]")
 
     st.write(f"### Variable: {selected_var}")
-    st.write(f"Label: {var_labels.get(selected_var, '(no label)')}")
+    st.write(f"Label: {variable_labels.get(selected_var, '(no label)')}")
 
     series = df[selected_var].dropna()
 
-    # Apply value labels if exist
-    label_name = value_labels.get(selected_var, None)
-    label_dict = label_sets.get(label_name, None)
+    # Apply value labels if they exist
+    label_dict = value_labels.get(selected_var, None)
 
     if label_dict:
-        mapped_series = series.map(label_dict).fillna(series)
+        series_mapped = series.map(label_dict).fillna(series)
     else:
-        mapped_series = series
+        series_mapped = series
 
     # Frequency table with percentages
-    freq = Counter(mapped_series)
+    freq = Counter(series_mapped)
     total = sum(freq.values())
     freq_table = pd.DataFrame({
         "Value": list(freq.keys()),

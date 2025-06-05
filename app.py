@@ -3,41 +3,41 @@ import pandas as pd
 import json
 from collections import Counter
 
-# Embedded files
+# Embedded files (relative paths)
 DATA_FILE = "example.csv"
 VAR_LABEL_FILE = "variable_labels.json"
 VAL_LABEL_FILE = "value_labels.json"
 
 # Load everything
-df = pd.read_csv(DATA_FILE, dtype=str)  # Load as string to avoid dtype issues
+df = pd.read_csv(DATA_FILE, dtype=str)
 with open(VAR_LABEL_FILE, 'r', encoding='utf-8') as f:
     variable_labels = json.load(f)
 with open(VAL_LABEL_FILE, 'r', encoding='utf-8') as f:
     value_labels = json.load(f)
 
+# Normalize keys to ensure perfect matching
+df.columns = df.columns.str.strip()
+variable_labels = {k.strip(): v for k, v in variable_labels.items()}
+value_labels = {k.strip(): {str(kk): vv for kk, vv in v.items()} for k, v in value_labels.items()}
+
 st.title("CSV Viewer with Variable and Value Labels")
 
-# Build mapping: var name → label
-var_label_pairs = [
-    (var, variable_labels.get(var, var)) for var in df.columns
+# Build dropdown using variable labels
+var_options = [
+    f"{variable_labels.get(var, var)} [{var}]" for var in df.columns
 ]
-
-# Create dropdown options: show label only
-options = [f"{label} [{var}]" for var, label in var_label_pairs]
-selected_option = st.selectbox("Select variable", options)
-
-# Extract selected variable
+selected_option = st.selectbox("Select variable", var_options)
 selected_var = selected_option.split("[")[-1].strip("]")
 
-# Show variable label on output
+# Display selected variable label
 var_label = variable_labels.get(selected_var, selected_var)
 st.subheader(f"Variable: {selected_var}")
 st.write(f"Label: {var_label}")
 
-# Prepare frequency table
 series = df[selected_var].dropna()
 label_dict = value_labels.get(selected_var, None)
 
+# Apply value labels if available
 if label_dict:
     series_mapped = series.map(label_dict).fillna(series)
 else:

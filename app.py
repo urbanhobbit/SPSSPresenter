@@ -4,9 +4,9 @@ import json
 from collections import Counter
 
 # Embedded files
-DATA_FILE = "/mnt/data/example.csv"
-VAR_LABEL_FILE = "/mnt/data/variable_labels.json"
-VAL_LABEL_FILE = "/mnt/data/value_labels.json"
+DATA_FILE = "example.csv"
+VAR_LABEL_FILE = "variable_labels.json"
+VAL_LABEL_FILE = "value_labels.json"
 
 # Load everything
 df = pd.read_csv(DATA_FILE, dtype=str)  # Load as string to avoid dtype issues

@@ -1,45 +1,42 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Descriptive Statistics Viewer (CSV & Stata DTA with Value Labels)")
+st.title("Stata DTA Viewer with Labels")
 
-uploaded_file = st.file_uploader("Upload CSV or Stata DTA file", type=["csv", "dta"])
+uploaded_file = st.file_uploader("Upload Stata DTA file", type=["dta"])
 
 if uploaded_file is not None:
-    filename = uploaded_file.name.lower()
-
     try:
-        if filename.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-            value_labels = {}  # No labels in CSV
-        elif filename.endswith('.dta'):
-            # Use iterator to access value labels
-            reader = pd.read_stata(uploaded_file, iterator=True)
-            df = reader.read()
-            value_labels = reader.value_labels()
-        else:
-            st.error("Unsupported file type.")
-            st.stop()
+        reader = pd.read_stata(uploaded_file, iterator=True)
+        df = reader.read()
+        value_labels = reader.value_labels()
     except Exception as e:
         st.error(f"Error loading file: {e}")
         st.stop()
 
-    # Display data preview safely
-    df_display = df.astype(str)
-    st.write("### Data Preview")
-    st.dataframe(df_display.head())
+    # Simulated variable labels (pandas cannot read variable labels)
+    # We simply fall back to column names.
+    variable_labels = {col: col for col in df.columns}
 
-    # Display value labels if any
-    if value_labels:
-        st.write("### Value Labels (from Stata file)")
-        for var, labels in value_labels.items():
-            st.write(f"**{var}**: {labels}")
+    # Build selection menu with variable labels
+    var_options = [
+        f"{variable_labels[var]} [{var}]" for var in df.columns
+    ]
+    selected_option = st.selectbox("Select a variable to analyze", var_options)
+    selected_var = selected_option.split("[")[-1].strip("]")
 
-    # Variable selector
-    column = st.selectbox("Select variable", df.columns)
-    values = df[column].dropna()
+    values = df[selected_var].dropna()
 
-    # Descriptive stats
+    # Apply value labels if exist
+    label_dict = value_labels.get(selected_var, None)
+
+    if label_dict:
+        mapped_values = values.map(label_dict).fillna(values)
+        display_series = mapped_values
+    else:
+        display_series = values
+
+    # Descriptive statistics
     if pd.api.types.is_numeric_dtype(values):
         st.write("### Descriptive Statistics (Numeric)")
         st.write(values.describe())
@@ -47,8 +44,8 @@ if uploaded_file is not None:
         st.write("### Descriptive Statistics (Non-Numeric)")
         st.write(f"Unique values: {values.nunique()}")
 
-    # Frequency distribution
-    freq_table = values.value_counts().reset_index()
-    freq_table.columns = ['Value', 'Frequency']
+    # Frequency distribution with value labels applied
+    freq_table = display_series.value_counts(dropna=False).reset_index()
+    freq_table.columns = ['Value Label', 'Frequency']
     st.write("### Frequency Distribution")
     st.dataframe(freq_table)

@@ -3,15 +3,27 @@ import csv
 import io
 from collections import Counter
 import statistics
+import stata_reader  # pure Python package
 
-st.title("Ultra-Simple Descriptive Statistics Viewer (Streamlit Cloud Compatible)")
+st.title("Ultra-Simple Descriptive Statistics Viewer (CSV and Stata DTA files)")
 
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+uploaded_file = st.file_uploader("Upload your CSV or DTA file", type=["csv", "dta"])
 
 if uploaded_file is not None:
-    content = uploaded_file.read().decode("utf-8")
-    csv_reader = csv.DictReader(io.StringIO(content))
-    data = list(csv_reader)
+    filename = uploaded_file.name.lower()
+
+    if filename.endswith(".csv"):
+        content = uploaded_file.read().decode("utf-8")
+        csv_reader = csv.DictReader(io.StringIO(content))
+        data = list(csv_reader)
+
+    elif filename.endswith(".dta"):
+        reader = stata_reader.read_dta(io.BytesIO(uploaded_file.read()))
+        data = [dict(zip(reader.columns, row)) for row in reader]
+
+    else:
+        st.error("Unsupported file type.")
+        st.stop()
 
     if not data:
         st.error("The file is empty.")
@@ -20,10 +32,11 @@ if uploaded_file is not None:
     columns = list(data[0].keys())
     selected_column = st.selectbox("Select a variable", columns)
 
-    values = [row[selected_column] for row in data if row[selected_column] != '']
+    values = [row[selected_column] for row in data if row[selected_column] not in ('', None)]
+
     st.write(f"Total valid entries: {len(values)}")
 
-    # Try to convert to numbers if possible
+    # Try numeric conversion
     try:
         numeric_values = list(map(float, values))
         st.write("### Descriptive Statistics")

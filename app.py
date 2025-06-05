@@ -3,53 +3,50 @@ import pandas as pd
 import json
 from collections import Counter
 
-st.title("CSV Viewer with Variable and Value Labels")
+# Embed files directly into the app
+DATA_FILE = "example.csv"
+VAR_LABEL_FILE = "variable_labels.json"
+VAL_LABEL_FILE = "value_labels.json"
 
-data_file = st.file_uploader("Upload CSV data file", type=["csv"])
-varlabel_file = st.file_uploader("Upload variable labels JSON file", type=["json"])
-vallabel_file = st.file_uploader("Upload value labels JSON file", type=["json"])
+# Load data (embedded)
+df = pd.read_csv(DATA_FILE)
+with open(VAR_LABEL_FILE, 'r', encoding='utf-8') as f:
+    variable_labels = json.load(f)
+with open(VAL_LABEL_FILE, 'r', encoding='utf-8') as f:
+    value_labels = json.load(f)
 
-if data_file and varlabel_file and vallabel_file:
-    # Load data
-    df = pd.read_csv(data_file)
+st.title("CSV Viewer with Embedded Variable and Value Labels")
 
-    # Load variable labels
-    variable_labels = json.load(varlabel_file)
+# Build dropdown using variable labels
+var_options = [
+    f"{variable_labels.get(var, var)} [{var}]" for var in df.columns
+]
+selected_option = st.selectbox("Select variable", var_options)
+selected_var = selected_option.split("[")[-1].strip("]")
 
-    # Load value labels
-    value_labels = json.load(vallabel_file)
+# Display selected variable label
+st.subheader(f"Variable: {selected_var}")
+st.write(f"Label: {variable_labels.get(selected_var, '(no label)')}")
 
-    # Variable selection with variable labels
-    var_options = [
-        f"{variable_labels.get(var, var)} [{var}]" for var in df.columns
-    ]
-    selected_option = st.selectbox("Select variable", var_options)
-    selected_var = selected_option.split("[")[-1].strip("]")
+series = df[selected_var].dropna()
+label_dict = value_labels.get(selected_var, None)
 
-    st.write(f"### Variable: {selected_var}")
-    st.write(f"Label: {variable_labels.get(selected_var, '(no label)')}")
+# Apply value labels if available
+if label_dict:
+    series_mapped = series.map(label_dict).fillna(series)
+else:
+    series_mapped = series
 
-    series = df[selected_var].dropna()
+# Build frequency table
+freq = Counter(series_mapped)
+total = sum(freq.values())
+freq_table = pd.DataFrame({
+    "Value": list(freq.keys()),
+    "Frequency": list(freq.values()),
+    "Percentage": [round(v / total * 100, 2) for v in freq.values()]
+}).sort_values("Frequency", ascending=False)
 
-    # Apply value labels if they exist
-    label_dict = value_labels.get(selected_var, None)
-
-    if label_dict:
-        series_mapped = series.map(label_dict).fillna(series)
-    else:
-        series_mapped = series
-
-    # Frequency table with percentages
-    freq = Counter(series_mapped)
-    total = sum(freq.values())
-    freq_table = pd.DataFrame({
-        "Value": list(freq.keys()),
-        "Frequency": list(freq.values()),
-        "Percentage": [round(v / total * 100, 2) for v in freq.values()]
-    }).sort_values("Frequency", ascending=False)
-
-    st.write("### Frequency Table")
-    st.dataframe(freq_table)
-
-    st.write("### Frequency Plot")
-    st.bar_chart(freq_table.set_index("Value")["Frequency"])
+st.write("### Frequency Table")
+st.dataframe(freq_table)
+st.write("### Frequency Plot")
+st.bar_chart(freq_table.set_index("Value")["Frequency"])
